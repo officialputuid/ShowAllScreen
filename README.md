@@ -1,16 +1,21 @@
-# ShowAllScreen
+# ShowAllScreen (SAS)
 This script helps you quickly access active `screen` sessions.
 
 ## Installation
 To install ShowAllScreen, run the following commands:
 ```bash
-sudo wget https://raw.githubusercontent.com/officialputuid/ShowAllScreen/main/ShowAllScreen -O /usr/local/bin/SAS && sudo chmod +x /usr/local/bin/SAS
+sudo wget https://s.id/ShowAllScreen -O /usr/local/bin/SAS && sudo chmod +x /usr/local/bin/SAS
 ```
 
 ## Usage
 To use the script, simply run:
 ```bash
 SAS
+```
+
+If you want to uninstall **SAS**, simply run:
+```bash
+sudo rm "/usr/local/bin/SAS"
 ```
 
 ## Features
