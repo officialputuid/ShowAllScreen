@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Fetch the list of active screen sessions
+active_screens=$(screen -ls | grep -Eo '[0-9]+\.[a-zA-Z0-9_.-]+')
+
+# Check if there are any active screens
+if [ -z "$active_screens" ]; then
+    echo "🚫 No active screen sessions found."
+    exit 1
+fi
+
+# Convert the screen sessions to an array
+screen_array=($active_screens)
+
+# Display the header
+echo -e "\n ____                                  "
+echo -e "/ ___|  ___ _ __ ___  ___ _ __          "
+echo -e "\\___ \\ / __| '__/ _ \\/ _ \\ '_ \\        "
+echo -e " ___) | (__| | |  __/  __/ | | |       "
+echo -e "|____/ \\___|_|  \\___|\\___|_| |_|       "
+echo -e "/ ___|  ___  ___ ___(_) ___  _ __  ___ "
+echo -e "\\___ \\ / _ \\/ __/ __| |/ _ \\| '_ \\/ __|"
+echo -e " ___) |  __/\\__ \\__ \\ | (_) | | | \\__ \\"
+echo -e "|____/ \\___||___/___/_|\\___/|_| |_|___/"
+echo -e "                                      "
+echo -e "by officialputuid"
+echo -e "\n"
+
+# Display the list of active screens
+echo -e "📋 List of screen sessions:"
+for i in "${!screen_array[@]}"; do
+    echo " $((i+1)). ${screen_array[$i]}"
+done
+
+# Loop until a valid number is entered
+while true; do
+    read -p $'\n🔢 Enter the screen number to open (e.g., 1): ' screen_number
+    # Check if the input is a valid number
+    if [[ "$screen_number" =~ ^[0-9]+$ ]] && [[ $screen_number -gt 0 && $screen_number -le ${#screen_array[@]} ]]; then
+        echo -e "\n🚀 Opening screen: ${screen_array[$((screen_number-1))]}..."
+        sleep 2 # Wait for 2 seconds
+        # Command to reattach to the selected screen
+        screen -r "${screen_array[$((screen_number-1))]}"
+        clear  # Clear the terminal screen after exiting the screen session
+        break
+    else
+        echo -e "\n❌ Invalid input. Please enter a valid screen number."
+    fi
+done
