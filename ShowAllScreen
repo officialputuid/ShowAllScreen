@@ -38,7 +38,7 @@ while true; do
     # Check if the input is a valid number
     if [[ "$screen_number" =~ ^[0-9]+$ ]] && [[ $screen_number -gt 0 && $screen_number -le ${#screen_array[@]} ]]; then
         echo -e "\n🚀 Opening screen: ${screen_array[$((screen_number-1))]}..."
-        sleep 2 # Wait for 2 seconds
+        sleep 1 # Wait for 1 seconds
         # Command to reattach to the selected screen
         screen -r "${screen_array[$((screen_number-1))]}"
         clear  # Clear the terminal screen after exiting the screen session
