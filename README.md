@@ -12,17 +12,17 @@ This script helps you quickly access active `screen` sessions.
 ## Installation
 To install ShowAllScreen, run the following commands:
 ```bash
-sudo wget https://s.id/ShowAllScreen -O /usr/local/bin/SAS && sudo chmod +x /usr/local/bin/SAS
+sudo wget https://raw.githubusercontent.com/officialputuid/ShowAllScreen/refs/heads/main/ShowAllScreen -O /usr/local/bin/SAS && sudo chmod +x /usr/local/bin/SAS
 ```
 
 On STB:
 ```bash
-sudo wget https://s.id/ShowAllScreen -O /usr/bin/SAS && sudo chmod +x /usr/bin/SAS
+sudo wget https://raw.githubusercontent.com/officialputuid/ShowAllScreen/refs/heads/main/ShowAllScreen -O /usr/bin/SAS && sudo chmod +x /usr/bin/SAS
 ```
 
 On Termux:
 ```bash
-wget https://s.id/ShowAllScreen -O $HOME/SAS && chmod +x $HOME/SAS && mv $HOME/SAS /data/data/com.termux/files/usr/bin/
+sudo wget https://raw.githubusercontent.com/officialputuid/ShowAllScreen/refs/heads/main/ShowAllScreen -O $HOME/SAS && chmod +x $HOME/SAS && mv $HOME/SAS /data/data/com.termux/files/usr/bin/
 ```
 
 ## Usage
