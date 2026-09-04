@@ -1,49 +1,203 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Fetch the list of active screen sessions
-active_screens=$(screen -ls | grep -Eo '[0-9]+\.[a-zA-Z0-9_.-]+')
+set -uo pipefail
 
-# Check if there are any active screens
-if [ -z "$active_screens" ]; then
-    echo "🚫 No active screen sessions found."
-    exit 1
-fi
+readonly APP_NAME='Screen Sessions'
+readonly VERSION='2.0'
 
-# Convert the screen sessions to an array
-screen_array=($active_screens)
+session_ids=()
+session_states=()
 
-# Display the header
-echo -e "\n ____                                  "
-echo -e "/ ___|  ___ _ __ ___  ___ _ __          "
-echo -e "\\___ \\ / __| '__/ _ \\/ _ \\ '_ \\        "
-echo -e " ___) | (__| | |  __/  __/ | | |       "
-echo -e "|____/ \\___|_|  \\___|\\___|_| |_|       "
-echo -e "/ ___|  ___  ___ ___(_) ___  _ __  ___ "
-echo -e "\\___ \\ / _ \\/ __/ __| |/ _ \\| '_ \\/ __|"
-echo -e " ___) |  __/\\__ \\__ \\ | (_) | | | \\__ \\"
-echo -e "|____/ \\___||___/___/_|\\___/|_| |_|___/"
-echo -e "                                      "
-echo -e "by officialputuid"
-echo -e "\n"
+usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]
 
-# Display the list of active screens
-echo -e "📋 List of screen sessions:"
-for i in "${!screen_array[@]}"; do
-    echo " $((i+1)). ${screen_array[$i]}"
-done
+Interactive GNU Screen session manager.
 
-# Loop until a valid number is entered
-while true; do
-    read -p $'\n🔢 Enter the screen number to open (e.g., 1): ' screen_number
-    # Check if the input is a valid number
-    if [[ "$screen_number" =~ ^[0-9]+$ ]] && [[ $screen_number -gt 0 && $screen_number -le ${#screen_array[@]} ]]; then
-        echo -e "\n🚀 Opening screen: ${screen_array[$((screen_number-1))]}..."
-        sleep 0.5 # Wait for 0.5 seconds
-        # Command to reattach to the selected screen
-        screen -x "${screen_array[$((screen_number-1))]}"
-        clear  # Clear the terminal screen after exiting the screen session
-        break
+Options:
+  -h, --help       Show this help
+  -t, --self-test  Run parser self-test
+  -v, --version    Show version
+EOF
+}
+
+setup_colors() {
+    if [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR:-} ]]; then
+        bold=$'\033[1m'; dim=$'\033[2m'; red=$'\033[31m'; green=$'\033[32m'
+        yellow=$'\033[33m'; blue=$'\033[34m'; cyan=$'\033[36m'; reset=$'\033[0m'
     else
-        echo -e "\n❌ Invalid input. Please enter a valid screen number."
+        bold=''; dim=''; red=''; green=''; yellow=''; blue=''; cyan=''; reset=''
     fi
-done
+}
+
+parse_sessions() {
+    local line
+    local pattern='^[[:space:]]*([0-9]+\.[^[:space:]]+)[[:space:]]+\(([^)]*)\)'
+    session_ids=()
+    session_states=()
+
+    while IFS= read -r line; do
+        if [[ $line =~ $pattern ]]; then
+            session_ids+=("${BASH_REMATCH[1]}")
+            session_states+=("${BASH_REMATCH[2]}")
+        fi
+    done
+}
+
+load_sessions() {
+    local output
+    output=$(screen -ls 2>&1 || true)
+    parse_sessions <<< "$output"
+}
+
+state_color() {
+    case ${1,,} in
+        detached*) printf '%s' "$green" ;;
+        attached*) printf '%s' "$yellow" ;;
+        dead*)     printf '%s' "$red" ;;
+        *)         printf '%s' "$dim" ;;
+    esac
+}
+
+print_header() {
+    printf '\033[2J\033[H'
+    printf '%s%s%s\n' "$bold$cyan" "$APP_NAME" "$reset"
+    printf '%sby officialputuid · v%s%s\n\n' "$dim" "$VERSION" "$reset"
+}
+
+print_sessions() {
+    local i color
+    if ((${#session_ids[@]} == 0)); then
+        printf '%sNo active screen sessions.%s\n\n' "$yellow" "$reset"
+        return
+    fi
+
+    printf '%sActive sessions%s\n' "$bold" "$reset"
+    for i in "${!session_ids[@]}"; do
+        color=$(state_color "${session_states[i]}")
+        printf '  %s%2d%s  %-32s %s%s%s\n' \
+            "$blue" "$((i + 1))" "$reset" "${session_ids[i]}" \
+            "$color" "${session_states[i]}" "$reset"
+    done
+    printf '\n'
+}
+
+pause() {
+    local _
+    read -r -p 'Press Enter to continue...' _ || true
+}
+
+run_screen_action() {
+    local action=$1 id=$2
+    case $action in
+        open)
+            printf '\nOpening %s...\n' "$id"
+            sleep 0.25
+            exec screen -x "$id"
+            ;;
+        detach)
+            if screen -S "$id" -X detach; then
+                printf '%sDetached: %s%s\n' "$green" "$id" "$reset"
+            else
+                printf '%sFailed to detach: %s%s\n' "$red" "$id" "$reset" >&2
+            fi
+            pause
+            ;;
+        kill)
+            local answer
+            read -r -p "Terminate $id? [y/N] " answer || true
+            if [[ $answer =~ ^[Yy]$ ]]; then
+                if screen -S "$id" -X quit; then
+                    printf '%sTerminated: %s%s\n' "$green" "$id" "$reset"
+                else
+                    printf '%sFailed to terminate: %s%s\n' "$red" "$id" "$reset" >&2
+                fi
+                pause
+            fi
+            ;;
+    esac
+}
+
+session_menu() {
+    local index=$1 id=${session_ids[index]} choice
+    while true; do
+        print_header
+        printf '%sSelected%s  %s\n' "$bold" "$reset" "$id"
+        printf '%sStatus%s    %s\n\n' "$bold" "$reset" "${session_states[index]}"
+        printf '  %s1%s  Open / attach\n' "$blue" "$reset"
+        printf '  %s2%s  Detach other display\n' "$blue" "$reset"
+        printf '  %s3%s  Terminate session\n' "$red" "$reset"
+        printf '  %sb%s  Back\n\n' "$dim" "$reset"
+        read -r -p 'Action: ' choice || return
+        case ${choice,,} in
+            1|o|open)   run_screen_action open "$id"; return ;;
+            2|d|detach) run_screen_action detach "$id"; return ;;
+            3|k|kill)   run_screen_action kill "$id"; return ;;
+            b|back|'')  return ;;
+            *) printf '%sInvalid action.%s\n' "$red" "$reset"; sleep 0.7 ;;
+        esac
+    done
+}
+
+main_menu() {
+    local choice index
+    while true; do
+        load_sessions
+        print_header
+        print_sessions
+        printf '%s[number]%s select   %sr%s refresh   %sq%s quit\n\n' \
+            "$blue" "$reset" "$blue" "$reset" "$blue" "$reset"
+        read -r -p 'Choice: ' choice || { printf '\n'; return; }
+
+        case ${choice,,} in
+            q|quit|exit) return ;;
+            r|refresh|'') continue ;;
+            *[!0-9]*|0) printf '%sInvalid choice.%s\n' "$red" "$reset"; sleep 0.7 ;;
+            *)
+                index=$((choice - 1))
+                if ((index >= 0 && index < ${#session_ids[@]})); then
+                    session_menu "$index"
+                else
+                    printf '%sSession number not found.%s\n' "$red" "$reset"
+                    sleep 0.7
+                fi
+                ;;
+        esac
+    done
+}
+
+self_test() {
+    local fixture
+    fixture=$'There are screens on:\n\t1234.worker-one\t(Detached)\n\t5678.api.v2\t(Attached)\n\t9012.old-job\t(Dead ???)\n3 Sockets in /run/screen/S-user.'
+    parse_sessions <<< "$fixture"
+
+    [[ ${#session_ids[@]} -eq 3 ]] || { printf 'Expected 3 sessions\n' >&2; return 1; }
+    [[ ${session_ids[0]} == '1234.worker-one' && ${session_states[0]} == 'Detached' ]] || return 1
+    [[ ${session_ids[1]} == '5678.api.v2' && ${session_states[1]} == 'Attached' ]] || return 1
+    [[ ${session_ids[2]} == '9012.old-job' && ${session_states[2]} == 'Dead ???' ]] || return 1
+    printf 'Self-test passed\n'
+}
+
+main() {
+    case ${1:-} in
+        -h|--help) usage; return ;;
+        -v|--version) printf '%s %s\n' "$APP_NAME" "$VERSION"; return ;;
+        -t|--self-test) self_test; return ;;
+        '') ;;
+        *) printf 'Unknown option: %s\n\n' "$1" >&2; usage >&2; return 2 ;;
+    esac
+
+    command -v screen >/dev/null 2>&1 || {
+        printf 'Error: GNU Screen is not installed or not in PATH.\n' >&2
+        return 127
+    }
+    [[ -t 0 ]] || {
+        printf 'Error: interactive terminal required.\n' >&2
+        return 1
+    }
+
+    main_menu
+}
+
+setup_colors
+main "$@"
